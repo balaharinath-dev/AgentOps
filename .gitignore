@@ -1,0 +1,88 @@
+# =========================
+# 🔐 Environment Variables
+# =========================
+.env
+.env.*
+*.env
+
+# =========================
+# 📦 Node (React frontend)
+# =========================
+frontend/node_modules/
+frontend/build/
+frontend/dist/
+frontend/.parcel-cache/
+frontend/.vite/
+frontend/.next/
+frontend/out/
+frontend/coverage/
+frontend/.eslintcache
+frontend/*.log
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# =========================
+# 🐍 Python (FastAPI backend)
+# =========================
+server/__pycache__/
+server/*.py[cod]
+server/*$py.class
+server/.Python
+server/env/
+server/venv/
+server/.venv/
+server/ENV/
+server/env.bak/
+server/venv.bak/
+
+# FastAPI / Uvicorn
+server/*.log
+
+# =========================
+# 🧪 Testing
+# =========================
+.coverage
+htmlcov/
+.pytest_cache/
+
+# =========================
+# 🧠 Mypy / Ruff / Lint
+# =========================
+.mypy_cache/
+.ruff_cache/
+.cache/
+
+# =========================
+# 🧱 Build Artifacts
+# =========================
+dist/
+build/
+*.egg-info/
+.eggs/
+
+# =========================
+# 🗄 Database
+# =========================
+*.db
+*.sqlite3
+
+# =========================
+# 💻 IDE / Editor
+# =========================
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# 🖥 OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# 🖥 Repo Files
+# =========================
+repository/*
