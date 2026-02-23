@@ -96,7 +96,6 @@ def execute_git_commands(
 
     return results
 
-
 def analyze_file_dependencies(
     changed_files: List[str],
     repo_path: Optional[str] = DEFAULT_REPO_PATH
@@ -153,7 +152,6 @@ def analyze_file_dependencies(
     
     return dependencies
 
-
 def _find_python_dependents(target_file: str, repo_path: str) -> List[str]:
     """Find Python files that import the target file using AST."""
     
@@ -197,7 +195,6 @@ def _find_python_dependents(target_file: str, repo_path: str) -> List[str]:
                 pass
     
     return list(set(dependents))
-
 
 def _find_js_dependents(target_file: str, repo_path: str) -> List[str]:
     """Find JS/TS files that import the target file using regex."""
