@@ -241,3 +241,151 @@ def compute_metrics(ast_report: Dict[str, Any]) -> Dict[str, List[Any]]:
         "large_classes": large_classes,
         "complex_functions": long_functions
     }
+
+from tree_sitter import Parser
+from tree_sitter_typescript import language_tsx
+
+JSX_EVENTS = {
+    "onClick", "onChange", "onSubmit",
+    "onKeyDown", "onKeyUp", "onBlur",
+    "onFocus", "onMouseEnter", "onMouseLeave"
+}
+
+API_IDENTIFIERS = {"fetch", "axios"}
+
+class ReactAnalyzer:
+    def __init__(self, source_code: str):
+        self.code = source_code.encode("utf-8")
+        self.parser = Parser()
+        self.parser.set_language(language_tsx())
+        self.tree = self.parser.parse(self.code)
+        self.root = self.tree.root_node
+
+        self.result = {
+            "component_name": None,
+            "export_type": None,
+            "props": [],
+            "hooks": [],
+            "state_variables": [],
+            "custom_hooks": [],
+            "event_handlers": [],
+            "api_calls": [],
+            "conditional_rendering": False,
+            "forms_present": False
+        }
+
+    def analyze(self):
+        self._walk(self.root)
+        return self.result
+
+    def _get_text(self, node):
+        return self.code[node.start_byte:node.end_byte].decode("utf-8")
+
+    def _walk(self, node):
+        node_type = node.type
+
+        # Component detection
+        if node_type == "function_declaration":
+            name = node.child_by_field_name("name")
+            if name:
+                self.result["component_name"] = self._get_text(name)
+
+        # Arrow function component
+        if node_type == "variable_declarator":
+            name = node.child_by_field_name("name")
+            value = node.child_by_field_name("value")
+            if name and value and value.type == "arrow_function":
+                self.result["component_name"] = self._get_text(name)
+
+        # Export detection
+        if node_type == "export_statement":
+            self.result["export_type"] = "named"
+        if node_type == "export_default_declaration":
+            self.result["export_type"] = "default"
+
+        # Hook detection
+        if node_type == "call_expression":
+            fn = node.child_by_field_name("function")
+            if fn:
+                fn_name = self._get_text(fn)
+                if fn_name.startswith("use"):
+                    if fn_name in ["useState", "useEffect", "useReducer", "useMemo", "useCallback"]:
+                        self.result["hooks"].append(fn_name)
+                    else:
+                        self.result["custom_hooks"].append(fn_name)
+
+                if fn_name in API_IDENTIFIERS:
+                    self.result["api_calls"].append(fn_name)
+
+        # State variable extraction
+        if node_type == "variable_declarator":
+            name = node.child_by_field_name("name")
+            value = node.child_by_field_name("value")
+            if value and value.type == "call_expression":
+                fn = value.child_by_field_name("function")
+                if fn and self._get_text(fn) == "useState":
+                    if name:
+                        self.result["state_variables"].append(self._get_text(name))
+
+        # Conditional rendering detection
+        if node_type in ["if_statement", "conditional_expression"]:
+            self.result["conditional_rendering"] = True
+
+        # JSX events
+        if node_type == "jsx_attribute":
+            attr_name = node.child_by_field_name("name")
+            if attr_name:
+                attr_text = self._get_text(attr_name)
+                if attr_text in JSX_EVENTS:
+                    self.result["event_handlers"].append(attr_text)
+
+        # Form detection
+        if node_type == "jsx_opening_element":
+            tag = node.child_by_field_name("name")
+            if tag:
+                tag_name = self._get_text(tag)
+                if tag_name in ["form", "input", "button", "select", "textarea"]:
+                    self.result["forms_present"] = True
+
+        for child in node.children:
+            self._walk(child)
+
+
+def analyze_react_file(file_path: str, repo_path: Optional[str] = DEFAULT_REPO_PATH):
+    """
+    Analyze a single React/TypeScript file using tree-sitter AST parsing.
+    
+    Extracts component structure, hooks, state, event handlers, and API calls.
+    Supports .tsx, .ts, .jsx, and .js files.
+    
+    :param file_path: Relative path to the file from repo root (e.g., "src/App.tsx")
+    :param repo_path: Path to the repository root [already set to default]
+    :return: Dictionary with component analysis including hooks, state, events, etc.
+    """
+    full_path = os.path.join(repo_path, file_path) if repo_path else file_path
+    
+    with open(full_path, "r", encoding="utf-8") as f:
+        code = f.read()
+
+    analyzer = ReactAnalyzer(code)
+    return analyzer.analyze()
+
+def analyze_frontend_project(changed_files: List[str], repo_path: Optional[str] = DEFAULT_REPO_PATH):
+    """
+    Analyze multiple frontend files in a project.
+    
+    Processes all React/TypeScript files and returns detailed analysis for each.
+    Filters for .tsx, .ts, .jsx, and .js files automatically.
+    
+    :param changed_files: List of relative file paths from repo root
+    :param repo_path: Path to the repository root [already set to default]
+    :return: Dictionary mapping file paths to their analysis results
+    """
+    results = {}
+    for file in changed_files:
+        if file.endswith((".tsx", ".ts", ".jsx", ".js")):
+            try:
+                results[file] = analyze_react_file(file, repo_path)
+            except Exception as e:
+                results[file] = {"error": str(e)}
+    return results

@@ -10,7 +10,9 @@ from tools.code_analyzer_tools import (
     analyze_python_ast, 
     build_dependency_graph,
     detect_cycles,
-    compute_metrics
+    compute_metrics,
+    analyze_react_file,
+    analyze_frontend_project
 )
 
 from state.state import GraphState
@@ -30,7 +32,15 @@ model = ChatGoogleGenerativeAI(
 agent = create_agent(
     model=model,
     system_prompt=SYSTEM_PROMPT,
-    tools=[execute_cli_commands, analyze_python_ast, build_dependency_graph, detect_cycles, compute_metrics]
+    tools=[
+        execute_cli_commands, 
+        analyze_python_ast, 
+        build_dependency_graph, 
+        detect_cycles, 
+        compute_metrics,
+        analyze_react_file,
+        analyze_frontend_project
+    ]
 )
 
 def code_analyzer_agent(state: GraphState):
