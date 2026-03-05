@@ -11,7 +11,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Database configuration
-DB_PATH = os.getenv("AGENTOPS_DB_PATH", "backend/database/agentops.db")
+# Get absolute path to database file
+_default_db_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "agentops.db")
+DB_PATH = os.getenv("AGENTOPS_DB_PATH", _default_db_path)
+
+# Ensure path is absolute
+if not os.path.isabs(DB_PATH):
+    DB_PATH = os.path.abspath(DB_PATH)
+
 DB_URL = f"sqlite:///{DB_PATH}"
 
 # Create engine

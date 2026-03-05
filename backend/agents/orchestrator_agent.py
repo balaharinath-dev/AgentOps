@@ -47,6 +47,11 @@ def orchestrator_agent(state: GraphState):
         current_agent_name = "push_analyzer"
         current_agent_output = "No output available - First run"
     
+    # Gather all previous reports for context
+    push_report = agent_outputs["push_analyzer"][-1] if agent_outputs["push_analyzer"] else "Not available"
+    code_report = agent_outputs["code_analyzer"][-1] if agent_outputs["code_analyzer"] else "Not available"
+    test_report = agent_outputs["test_generator"][-1] if agent_outputs["test_generator"] else "Not available"
+    
     # Build dynamic initial query based on which agent just ran
     initial_query = f"""
     Review the output from the {current_agent_name.replace('_', ' ').title()} Agent and determine the next step.
@@ -55,10 +60,21 @@ def orchestrator_agent(state: GraphState):
 
     Current Agent: {current_agent_name}
 
-    Agent Output:
+    CUMULATIVE REPORTS (for context):
+
+    Push Analyzer Report:
+    {push_report}
+
+    Code Analyzer Report:
+    {code_report}
+
+    Test Generator Report:
+    {test_report}
+
+    Current Agent Output (focus validation here):
     {current_agent_output}
 
-    Validate the output and decide:
+    Validate the current agent's output and decide:
     - If quality is good: Specify the next agent to proceed
     - If quality is inadequate: Request rework from {current_agent_name} with specific recommendations
 

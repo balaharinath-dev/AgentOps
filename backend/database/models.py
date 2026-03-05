@@ -13,6 +13,30 @@ from datetime import datetime
 Base = declarative_base()
 
 
+class User(Base):
+    """Users table for app login (separate from git committers)"""
+    __tablename__ = 'users'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(100), unique=True, nullable=False)
+    email = Column(String(255), unique=True, nullable=False)
+    password_hash = Column(String(255), nullable=False)
+    full_name = Column(String(255))
+    is_active = Column(Boolean, default=True)
+    is_admin = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    last_login = Column(DateTime)
+    
+    __table_args__ = (
+        Index('idx_users_username', 'username'),
+        Index('idx_users_email', 'email'),
+        Index('idx_users_is_active', 'is_active'),
+    )
+    
+    def __repr__(self):
+        return f"<User(username='{self.username}', email='{self.email}', is_active={self.is_active})>"
+
+
 class WorkflowRun(Base):
     """Track each workflow execution (one per commit)"""
     __tablename__ = 'workflow_runs'
@@ -22,6 +46,12 @@ class WorkflowRun(Base):
     repo_path = Column(String(500), nullable=False)
     repo_name = Column(String(255), nullable=False)
     branch = Column(String(255))
+    
+    # Git committer information (from git commit)
+    committer_name = Column(String(255))
+    committer_email = Column(String(255))
+    commit_message = Column(Text)
+    
     started_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime)
     status = Column(String(50), default='running')
@@ -33,10 +63,11 @@ class WorkflowRun(Base):
         Index('idx_workflow_commit_repo', 'commit_id', 'repo_path'),
         Index('idx_workflow_status', 'status'),
         Index('idx_workflow_started', 'started_at'),
+        Index('idx_workflow_committer', 'committer_email'),
     )
     
     def __repr__(self):
-        return f"<WorkflowRun(commit_id='{self.commit_id}', repo_name='{self.repo_name}', status='{self.status}')>"
+        return f"<WorkflowRun(commit_id='{self.commit_id}', repo_name='{self.repo_name}', committer='{self.committer_name}', status='{self.status}')>"
 
 
 class AgentState(Base):

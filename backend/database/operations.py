@@ -20,7 +20,10 @@ def create_workflow_run(
     commit_id: str,
     repo_path: str,
     repo_name: str,
-    branch: str = None
+    branch: str = None,
+    committer_name: str = None,
+    committer_email: str = None,
+    commit_message: str = None
 ) -> WorkflowRun:
     """
     Create a new workflow run.
@@ -30,6 +33,9 @@ def create_workflow_run(
         repo_path: Path to repository
         repo_name: Name of repository
         branch: Git branch name
+        committer_name: Name of person who made the commit
+        committer_email: Email of person who made the commit
+        commit_message: Git commit message
     
     Returns:
         WorkflowRun: Created workflow run instance
@@ -40,6 +46,9 @@ def create_workflow_run(
             repo_path=repo_path,
             repo_name=repo_name,
             branch=branch,
+            committer_name=committer_name,
+            committer_email=committer_email,
+            commit_message=commit_message,
             status='running'
         )
         session.add(workflow)
@@ -159,10 +168,10 @@ def get_agent_state(
 def save_test_script(
     commit_id: str,
     repo_path: str,
-    test_file_path: str,
-    source_file_path: str,
-    test_type: str,
-    test_code: str,
+    test_file_path: str = None,  # Now optional - not needed for temp files
+    source_file_path: str = None,
+    test_type: str = None,
+    test_code: str = None,
     test_count: int = 0,
     model_used: str = None,
     prompt_used: str = None
@@ -173,7 +182,7 @@ def save_test_script(
     Args:
         commit_id: Git commit ID
         repo_path: Path to repository
-        test_file_path: Path to test file
+        test_file_path: Path to test file (optional - not needed for temp files)
         source_file_path: Path to source file being tested
         test_type: Type of test
         test_code: Full test code
@@ -188,10 +197,10 @@ def save_test_script(
         test_script = TestScript(
             commit_id=commit_id,
             repo_path=repo_path,
-            test_file_path=test_file_path,
-            source_file_path=source_file_path,
-            test_type=test_type,
-            test_code=test_code,
+            test_file_path=test_file_path or "temp",  # Use "temp" if not provided
+            source_file_path=source_file_path or "unknown",
+            test_type=test_type or "unknown",
+            test_code=test_code or "",
             test_count=test_count,
             model_used=model_used,
             prompt_used=prompt_used
@@ -210,7 +219,10 @@ def create_test_execution(
     pytest_version: str = None
 ) -> TestExecution:
     """
-    Create a new test execution record.
+    Create a new test execution record or reuse existing one.
+    
+    If a test execution already exists for this commit_id and repo_path,
+    it will be updated instead of creating a new one (to avoid unique constraint violation).
     
     Args:
         execution_id: Unique execution ID
@@ -220,21 +232,42 @@ def create_test_execution(
         pytest_version: Pytest version
     
     Returns:
-        TestExecution: Created test execution instance
+        TestExecution: Created or updated test execution instance
     """
     with get_session() as session:
-        execution = TestExecution(
-            execution_id=execution_id,
+        # Check if execution already exists for this commit+repo
+        existing = session.query(TestExecution).filter_by(
             commit_id=commit_id,
-            repo_path=repo_path,
-            python_version=python_version,
-            pytest_version=pytest_version,
-            status='running'
-        )
-        session.add(execution)
-        session.commit()
-        session.refresh(execution)
-        return execution
+            repo_path=repo_path
+        ).first()
+        
+        if existing:
+            # Update existing execution
+            existing.execution_id = execution_id
+            existing.started_at = datetime.utcnow()
+            existing.completed_at = None
+            existing.status = 'running'
+            if python_version:
+                existing.python_version = python_version
+            if pytest_version:
+                existing.pytest_version = pytest_version
+            session.commit()
+            session.refresh(existing)
+            return existing
+        else:
+            # Create new execution
+            execution = TestExecution(
+                execution_id=execution_id,
+                commit_id=commit_id,
+                repo_path=repo_path,
+                python_version=python_version,
+                pytest_version=pytest_version,
+                status='running'
+            )
+            session.add(execution)
+            session.commit()
+            session.refresh(execution)
+            return execution
 
 
 def update_test_execution(
@@ -406,4 +439,156 @@ def query_test_history(
                 'created_at': r.created_at.isoformat() if r.created_at else None
             }
             for r in results
+        ]
+
+
+
+# User Management Functions
+
+def create_user(
+    username: str,
+    email: str,
+    password_hash: str,
+    full_name: str = None,
+    is_admin: bool = False
+):
+    """
+    Create a new user for app login.
+    
+    Args:
+        username: Unique username
+        email: Unique email address
+        password_hash: Hashed password (use bcrypt or similar)
+        full_name: User's full name
+        is_admin: Whether user has admin privileges
+    
+    Returns:
+        User: Created user instance
+    """
+    from .models import User
+    
+    with get_session() as session:
+        user = User(
+            username=username,
+            email=email,
+            password_hash=password_hash,
+            full_name=full_name,
+            is_admin=is_admin,
+            is_active=True
+        )
+        session.add(user)
+        session.commit()
+        session.refresh(user)
+        return user
+
+
+def get_user_by_username(username: str):
+    """
+    Get user by username.
+    
+    Args:
+        username: Username to search for
+    
+    Returns:
+        User or None
+    """
+    from .models import User
+    
+    with get_session() as session:
+        user = session.query(User).filter_by(username=username).first()
+        return user
+
+
+def get_user_by_email(email: str):
+    """
+    Get user by email.
+    
+    Args:
+        email: Email to search for
+    
+    Returns:
+        User or None
+    """
+    from .models import User
+    
+    with get_session() as session:
+        user = session.query(User).filter_by(email=email).first()
+        return user
+
+
+def update_user_last_login(user_id: int):
+    """
+    Update user's last login timestamp.
+    
+    Args:
+        user_id: User ID
+    
+    Returns:
+        bool: True if successful
+    """
+    from .models import User
+    
+    with get_session() as session:
+        user = session.query(User).filter_by(id=user_id).first()
+        if user:
+            user.last_login = datetime.utcnow()
+            session.commit()
+            return True
+        return False
+
+
+def deactivate_user(user_id: int):
+    """
+    Deactivate a user account.
+    
+    Args:
+        user_id: User ID
+    
+    Returns:
+        bool: True if successful
+    """
+    from .models import User
+    
+    with get_session() as session:
+        user = session.query(User).filter_by(id=user_id).first()
+        if user:
+            user.is_active = False
+            session.commit()
+            return True
+        return False
+
+
+def list_users(active_only: bool = True, limit: int = 100) -> List[Dict[str, Any]]:
+    """
+    List all users.
+    
+    Args:
+        active_only: Only return active users
+        limit: Maximum number of users to return
+    
+    Returns:
+        List of user dictionaries
+    """
+    from .models import User
+    
+    with get_session() as session:
+        query = session.query(User)
+        
+        if active_only:
+            query = query.filter(User.is_active == True)
+        
+        users = query.limit(limit).all()
+        
+        return [
+            {
+                'id': u.id,
+                'username': u.username,
+                'email': u.email,
+                'full_name': u.full_name,
+                'is_active': u.is_active,
+                'is_admin': u.is_admin,
+                'created_at': u.created_at.isoformat() if u.created_at else None,
+                'last_login': u.last_login.isoformat() if u.last_login else None
+            }
+            for u in users
         ]
