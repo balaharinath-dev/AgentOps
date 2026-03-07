@@ -26,7 +26,10 @@ def create_workflow_run(
     commit_message: str = None
 ) -> WorkflowRun:
     """
-    Create a new workflow run.
+    Create a new workflow run or return existing one.
+    
+    If a workflow_run already exists for this commit_id + repo_path,
+    it will be returned instead of creating a duplicate.
     
     Args:
         commit_id: Git commit ID
@@ -38,9 +41,28 @@ def create_workflow_run(
         commit_message: Git commit message
     
     Returns:
-        WorkflowRun: Created workflow run instance
+        WorkflowRun: Created or existing workflow run instance
     """
     with get_session() as session:
+        # Check if workflow_run already exists
+        existing = session.query(WorkflowRun).filter_by(
+            commit_id=commit_id,
+            repo_path=repo_path
+        ).first()
+        
+        if existing:
+            # Update it with latest info
+            existing.branch = branch
+            existing.committer_name = committer_name
+            existing.committer_email = committer_email
+            existing.commit_message = commit_message
+            existing.status = 'running'
+            existing.started_at = datetime.utcnow()
+            session.commit()
+            session.refresh(existing)
+            return existing
+        
+        # Create new workflow_run
         workflow = WorkflowRun(
             commit_id=commit_id,
             repo_path=repo_path,
@@ -592,3 +614,47 @@ def list_users(active_only: bool = True, limit: int = 100) -> List[Dict[str, Any
             }
             for u in users
         ]
+
+
+def update_workflow_deployment_decision(
+    commit_id: str,
+    repo_path: str,
+    deployment_status: str,
+    jira_story_key: str = None,
+    jira_story_url: str = None,
+    jira_task_keys: str = None
+) -> bool:
+    """
+    Update workflow run with deployment decision and Jira ticket information.
+    
+    Args:
+        commit_id: Git commit ID
+        repo_path: Path to repository
+        deployment_status: "DEPLOY" or "BLOCK"
+        jira_story_key: Jira story key (e.g., "CICD-123")
+        jira_story_url: Full URL to the Jira story
+        jira_task_keys: Comma-separated list of task keys
+    
+    Returns:
+        bool: True if successful
+    """
+    with get_session() as session:
+        workflow = session.query(WorkflowRun).filter_by(
+            commit_id=commit_id,
+            repo_path=repo_path
+        ).first()
+        
+        if workflow:
+            workflow.deployment_status = deployment_status
+            workflow.deployment_decision_at = datetime.utcnow()
+            
+            if jira_story_key:
+                workflow.jira_story_key = jira_story_key
+            if jira_story_url:
+                workflow.jira_story_url = jira_story_url
+            if jira_task_keys:
+                workflow.jira_task_keys = jira_task_keys
+            
+            session.commit()
+            return True
+        return False

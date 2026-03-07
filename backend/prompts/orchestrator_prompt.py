@@ -71,8 +71,10 @@ RECOMMENDATION:
 ```
 
 **Agent Names & Workflow Order:**
-- push_analyzer → code_analyzer → test_generator
-- Use exact names: "push_analyzer", "code_analyzer", "test_generator"
+- push_analyzer → code_analyzer → test_generator → deployment_gateway
+- Use exact names: "push_analyzer", "code_analyzer", "test_generator", "deployment_gateway"
+- After test_generator validation passes, ALWAYS proceed to deployment_gateway
+- deployment_gateway is the FINAL agent - it does not return to orchestrator
 
 **Guidelines:**
 - Be specific in feedback - point out what's missing or inadequate

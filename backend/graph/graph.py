@@ -14,10 +14,11 @@ from agents.orchestrator_agent import orchestrator_agent
 from agents.push_analyzer_agent import push_analyzer_agent
 from agents.code_analyzer_agent import code_analyzer_agent
 from agents.test_generator_agent import test_generator_agent
+from agents.deployment_gateway_agent import deployment_gateway_agent
 
 from state.state import GraphState
 
-def route_decision(state: GraphState) -> Literal["push_analyzer_agent", "code_analyzer_agent", "test_generator_agent", "__end__"]:
+def route_decision(state: GraphState) -> Literal["push_analyzer_agent", "code_analyzer_agent", "test_generator_agent", "deployment_gateway_agent", "__end__"]:
     """Route based on orchestrator's decision"""
     next_agent = state.get("next_agent", "")
     
@@ -29,6 +30,8 @@ def route_decision(state: GraphState) -> Literal["push_analyzer_agent", "code_an
             return "code_analyzer_agent"
         elif "test_generator" in next_agent.lower():
             return "test_generator_agent"
+        elif "deployment_gateway" in next_agent.lower():
+            return "deployment_gateway_agent"
     
     # Default: end the workflow
     return "__end__"
@@ -39,11 +42,13 @@ build.add_node("orchestrator_agent", orchestrator_agent)
 build.add_node("push_analyzer_agent", push_analyzer_agent)
 build.add_node("code_analyzer_agent", code_analyzer_agent)
 build.add_node("test_generator_agent", test_generator_agent)
+build.add_node("deployment_gateway_agent", deployment_gateway_agent)
 
 build.add_edge(START, "push_analyzer_agent")
 build.add_edge("push_analyzer_agent", "orchestrator_agent")
 build.add_edge("code_analyzer_agent", "orchestrator_agent")
 build.add_edge("test_generator_agent", "orchestrator_agent")
+build.add_edge("deployment_gateway_agent", END)  # Final agent - goes directly to END
 
 # Conditional routing from orchestrator based on its decision
 build.add_conditional_edges("orchestrator_agent", route_decision)
@@ -58,7 +63,11 @@ if __name__ == "__main__":
             "push_analyzer_agent": [],
             "code_analyzer_agent": [],
             "test_generator_agent": [],
-            "next_agent": None
+            "deployment_gateway_agent": [],
+            "next_agent": None,
+            "workflow_run_id": None,
+            "commit_id": None,
+            "repo_path": None
         }, 
         {"configurable": {"thread_id": "1"}}
     )
@@ -66,3 +75,12 @@ if __name__ == "__main__":
     print("\n" + "="*80)
     print(" "*30 + "WORKFLOW COMPLETE")
     print("="*80)
+    
+    # Print final workflow info
+    if result.get("workflow_run_id"):
+        print(f"\nWorkflow Run ID: {result['workflow_run_id']}")
+    if result.get("commit_id"):
+        print(f"Commit ID: {result['commit_id']}")
+    if result.get("repo_path"):
+        print(f"Repository: {result['repo_path']}")
+    print()

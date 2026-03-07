@@ -107,5 +107,20 @@ def orchestrator_agent(state: GraphState):
     state["orchestrator_agent"] = state.get("orchestrator_agent", [])
     state["orchestrator_agent"].append({"validation": validation_content})
     state["next_agent"] = validation_content
+    
+    # CRITICAL: Explicitly preserve workflow tracking fields
+    # LangGraph replaces scalar fields if not explicitly returned
+    # These MUST be returned to persist across agent transitions
+    result = {
+        "orchestrator_agent": state["orchestrator_agent"],
+        "push_analyzer_agent": state.get("push_analyzer_agent", []),
+        "code_analyzer_agent": state.get("code_analyzer_agent", []),
+        "test_generator_agent": state.get("test_generator_agent", []),
+        "deployment_gateway_agent": state.get("deployment_gateway_agent", []),
+        "next_agent": state["next_agent"],
+        "workflow_run_id": state.get("workflow_run_id"),
+        "commit_id": state.get("commit_id"),
+        "repo_path": state.get("repo_path"),
+    }
 
-    return state
+    return result

@@ -9,6 +9,7 @@ from sqlalchemy import (
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 from datetime import datetime
+import uuid
 
 Base = declarative_base()
 
@@ -41,7 +42,7 @@ class WorkflowRun(Base):
     """Track each workflow execution (one per commit)"""
     __tablename__ = 'workflow_runs'
     
-    id = Column(Integer, primary_key=True, autoincrement=True)
+    id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     commit_id = Column(String(255), nullable=False)
     repo_path = Column(String(500), nullable=False)
     repo_name = Column(String(255), nullable=False)
@@ -57,17 +58,28 @@ class WorkflowRun(Base):
     status = Column(String(50), default='running')
     total_duration_seconds = Column(Float)
     
+    # Deployment decision
+    deployment_status = Column(String(50))  # 'DEPLOY' or 'BLOCK'
+    deployment_decision_at = Column(DateTime)
+    
+    # Jira integration (for BLOCK status)
+    jira_story_key = Column(String(100))
+    jira_story_url = Column(String(500))
+    jira_task_keys = Column(Text)  # Comma-separated list of task keys
+    
     __table_args__ = (
         UniqueConstraint('commit_id', 'repo_path', name='uq_workflow_commit_repo'),
         CheckConstraint("status IN ('running', 'completed', 'failed', 'cancelled')", name='ck_workflow_status'),
+        CheckConstraint("deployment_status IN ('DEPLOY', 'BLOCK') OR deployment_status IS NULL", name='ck_workflow_deployment_status'),
         Index('idx_workflow_commit_repo', 'commit_id', 'repo_path'),
         Index('idx_workflow_status', 'status'),
         Index('idx_workflow_started', 'started_at'),
         Index('idx_workflow_committer', 'committer_email'),
+        Index('idx_workflow_deployment_status', 'deployment_status'),
     )
     
     def __repr__(self):
-        return f"<WorkflowRun(commit_id='{self.commit_id}', repo_name='{self.repo_name}', committer='{self.committer_name}', status='{self.status}')>"
+        return f"<WorkflowRun(id='{self.id}', commit_id='{self.commit_id}', repo_name='{self.repo_name}', committer='{self.committer_name}', status='{self.status}', deployment='{self.deployment_status}')>"
 
 
 class AgentState(Base):
